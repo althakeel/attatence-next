@@ -307,7 +307,7 @@ export default function StaffDashboardRemote() {
     });
 
     setBreakDuration(totalDuration);
-    setBreaksList(updatedBreaksList);
+    setBreaksList(updatedBreaksList);  
     setIsOnBreak(false);
     setBreakStartTime(null);
   };
