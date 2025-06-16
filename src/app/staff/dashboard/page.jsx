@@ -331,8 +331,8 @@ export default function StaffDashboardRemote() {
                 className={activeSection === 'work' ? 'active' : ''}
                 onClick={() => setActiveSection('work')}
               >
-                Work Status
-              </li>
+                Work Status 
+              </li> 
               <li
                 className={activeSection === 'notes' ? 'active' : ''}
                 onClick={() => setActiveSection('notes')}
