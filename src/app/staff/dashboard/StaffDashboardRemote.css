@@ -1,0 +1,152 @@
+/* Layout container */
+.dashboard-container-remote {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f4f6f8;
+  color: #2c3e50;
+}
+
+/* Sidebar */
+.sidebar-remote {
+  width: 220px;
+  background: #34495e;
+  color: #ecf0f1;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  box-shadow: 3px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-remote h2 {
+  font-weight: 700;
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+.status-indicator {
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-align: center;
+  user-select: none;
+  cursor: default;
+  width: 100%;
+  box-sizing: border-box;
+  letter-spacing: 0.05em;
+}
+
+.status-indicator.online {
+  background-color: #27ae60;
+  color: #ecf0f1;
+  box-shadow: 0 0 8px #27ae60aa;
+}
+
+.status-indicator.offline {
+  background-color: #c0392b;
+  color: #ecf0f1;
+  box-shadow: 0 0 8px #c0392baa;
+}
+
+.sidebar-remote nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-remote nav ul li {
+  margin: 1rem 0;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.sidebar-remote nav ul li.active,
+.sidebar-remote nav ul li:hover {
+  background-color: #2980b9;
+  font-weight: 700;
+  color: white;
+}
+
+/* Main content */
+.content-remote {
+  flex-grow: 1;
+  padding: 2rem 3rem;
+  background: #fff;
+  overflow-y: auto;
+}
+
+h1,
+h2 {
+  color: #34495e;
+  margin-bottom: 1rem;
+}
+
+/* Attendance card */
+.attendance-card-remote {
+  background: #eaf0f1;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: inset 0 0 6px #d0d7db;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.attendance-info div {
+  margin-bottom: 0.8rem;
+  font-size: 1.1rem;
+}
+
+.attendance-actions button {
+  padding: 10px 30px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background-color 0.3s ease;
+  min-width: 130px;
+}
+
+.btn-primary {
+  background-color: #2980b9;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1c5980;
+}
+
+.btn-danger {
+  background-color: #c0392b;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #89231a;
+}
+
+/* Notes section */
+.notes-section textarea {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  min-height: 160px;
+}
+
+.notes-section small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #777;
+  font-style: italic;
+}

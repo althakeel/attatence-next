@@ -1,0 +1,230 @@
+/* Container */
+.roles-container {
+  max-width: 1250px;
+  margin: 3rem auto;
+  padding: 2.5rem 3rem;
+  background: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #2c3e50;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Headings */
+h2, h3 {
+  font-weight: 700;
+  color: #34495e;
+  margin-bottom: 1.8rem;
+  letter-spacing: 0.03em;
+}
+
+/* Alerts */
+.alert {
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-left: 6px solid;
+}
+
+.alert.error {
+  background-color: #ffe6e6;
+  color: #c0392b;
+  border-color: #c0392b;
+}
+
+.alert.success {
+  background-color: #e6f4ea;
+  color: #27ae60;
+  border-color: #27ae60;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 8px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding: 0.7rem 1.4rem;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn.primary {
+  background-color: #2980b9;
+  color: #fff;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background-color: #1c5980;
+  box-shadow: 0 5px 15px rgba(41, 128, 185, 0.5);
+}
+
+.btn.secondary {
+  background-color: #ecf0f1;
+  color: #34495e;
+  box-shadow: none;
+  border: 1px solid #bdc3c7;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background-color: #d0d7db;
+  border-color: #95a5a6;
+}
+
+.btn.danger {
+  background-color: #e74c3c;
+  color: #fff;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background-color: #b0392e;
+  box-shadow: 0 5px 15px rgba(231, 76, 60, 0.5);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Form */
+.roles-form {
+  background: #fafafa;
+  padding: 2.5rem 3rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.6rem 2rem;
+  margin-top: 2rem;
+}
+
+/* Labels */
+.roles-form label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #34495e;
+}
+
+/* Inputs & Select */
+/* Target all inputs except checkboxes */
+.roles-form input:not([type="checkbox"]),
+.roles-form select {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1.5px solid #ced6e0;
+  background: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.05);
+}
+
+.roles-form input:not([type="checkbox"]):focus,
+.roles-form select:focus {
+  outline: none;
+  border-color: #2980b9;
+  box-shadow: 0 0 6px rgba(41, 128, 185, 0.4);
+}
+
+/* Checkbox */
+.roles-form input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* Checkbox label wrapper for spacing */
+.roles-form .checkbox-row {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #34495e;
+}
+
+/* Button group inside form */
+.roles-form .btn-group {
+  grid-column: span 2;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+}
+
+/* Table */
+.users-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+  margin-top: 2rem;
+  font-size: 1rem;
+  color: #34495e;
+}
+
+.users-table th {
+  font-weight: 700;
+  padding: 0.85rem 1.25rem;
+  text-align: left;
+  background: transparent;
+  color: #2c3e50;
+  border-bottom: 2px solid #dfe6e9;
+  letter-spacing: 0.02em;
+}
+
+.users-table td {
+  background: #f7f9fc;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  vertical-align: middle;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
+}
+
+.users-table tbody tr:hover td {
+  background: #dbe9f7;
+}
+
+.users-table td button {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .roles-container {
+    padding: 1.5rem 1.5rem;
+  }
+
+  .roles-form {
+    grid-template-columns: 1fr;
+    padding: 1.5rem 1.5rem;
+  }
+
+  .roles-form .checkbox-row,
+  .roles-form .btn-group {
+    grid-column: span 1;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .btn {
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+  }
+}

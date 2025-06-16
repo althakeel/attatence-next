@@ -1,0 +1,83 @@
+.admin-dashboard {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.admin-sidebar {
+  background-color: #1f2937;
+  color: white;
+  padding: 20px;
+  width: 260px;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-sidebar h2 {
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.admin-sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.admin-sidebar li {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-radius: 4px;
+}
+
+.admin-sidebar li:hover {
+  background-color: #374151;
+}
+
+.admin-sidebar li.active {
+  font-weight: bold;
+  background-color: #4a90e2;
+  color: white;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 40px;
+  background-color: #f9fafb;
+}
+
+.admin-content h1 {
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.staff-table th, .staff-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.staff-table th {
+  background-color: #f0f2f5;
+  color: #333;
+}
+
+.status-online {
+  color: #10b981; /* bright green */
+  font-weight: bold;
+}
+
+.status-offline {
+  color: #ef4444; /* bright red */
+  font-weight: bold;
+}
