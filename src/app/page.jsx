@@ -49,7 +49,7 @@ export default function Home() {
     checkSession();
   }, [router]);
 
-  if (checking) {
+  if (checking) { 
     return (
       <div style={{
         height: '100vh',
