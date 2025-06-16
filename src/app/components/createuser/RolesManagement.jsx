@@ -145,16 +145,18 @@ export default function RolesManagement() {
     setShowAddUserForm(true);
   };
 
-  const handleDelete = async (userId) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    try {
-      await deleteDoc(doc(db, 'users', userId));
-      setFormSuccess('User deleted.');
-      setUsers(users.filter(u => u.id !== userId));
-    } catch {
-      setFormError('Error deleting user.');
-    }
-  };
+const handleDelete = async (userId) => {
+  if (!confirm('Are you sure you want to delete this user?')) return;
+  try {
+    console.log("Deleting user:", userId); // Add this
+    await deleteDoc(doc(db, 'users', userId));
+    setFormSuccess('User deleted.');
+    setUsers(users.filter(u => u.id !== userId));
+  } catch (err) {
+    console.error('Error deleting user:', err); // Log the error
+    setFormError('Error deleting user.');
+  }
+};
 
   return (
     <div className="roles-container">
