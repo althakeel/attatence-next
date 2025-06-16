@@ -31,6 +31,8 @@ export default function RolesManagement() {
   const [loading, setLoading] = useState(false);
   const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+
 
   // 🔄 Fetch users from Firestore
   useEffect(() => {
@@ -63,6 +65,15 @@ export default function RolesManagement() {
     setFormSuccess('');
     setLoading(false);
   };
+
+  const generatePassword = (length = 12) => {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~';
+  let newPassword = '';
+  for (let i = 0; i < length; i++) {
+    newPassword += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return newPassword;
+};
 
   // 🧩 Handle form changes
   const handleChange = (e) => {
@@ -177,8 +188,43 @@ const handleDelete = async (userId) => {
   <form onSubmit={handleSubmit} className="roles-form">
     <input type="text" name="fullName" placeholder="Full Name*" value={formData.fullName} onChange={handleChange} />
     <input type="email" name="email" placeholder="Email*" value={formData.email} onChange={handleChange} disabled={!!editingUserId} />
-    <input type="password" name="password" placeholder="Password*" value={formData.password} onChange={handleChange} />
-    <input type="password" name="confirmPassword" placeholder="Confirm Password*" value={formData.confirmPassword} onChange={handleChange} />
+
+<input
+  type={showPassword ? "text" : "password"}
+  name="password"
+  placeholder="Password*"
+  value={formData.password}
+  onChange={handleChange}
+/>  
+  <input
+  type={showPassword ? "text" : "password"}
+  name="confirmPassword"
+  placeholder="Confirm Password*"
+  value={formData.confirmPassword}
+  onChange={handleChange}
+/>
+<div className="form-actions-row">
+  <button type="button" className="btn secondary" onClick={() => {
+    const newPass = generatePassword();
+    setFormData(prev => ({
+      ...prev,
+      password: newPass,
+      confirmPassword: newPass
+    }));
+    setShowPassword(true);
+  }}>
+    Generate Password
+  </button>
+
+  <label style={{ marginLeft: '1rem' }}>
+    <input
+      type="checkbox"
+      checked={showPassword}
+      onChange={() => setShowPassword(prev => !prev)}
+    />
+    Show Password
+  </label>
+</div>
     <input type="text" name="designation" placeholder="Designation*" value={formData.designation} onChange={handleChange} />
     <label>
       <input type="checkbox" name="workFromHome" checked={formData.workFromHome} onChange={handleChange} />
