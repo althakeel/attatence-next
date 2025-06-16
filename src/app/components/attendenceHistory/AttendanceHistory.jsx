@@ -16,13 +16,20 @@ function formatTime(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SmallCalendar({ userId }) {
-  const today = new Date();
+// Format seconds as HH:mm:ss
+function formatDuration(seconds) {
+  if (typeof seconds !== 'number' || seconds <= 0) return '--:--:--';
+  const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+  const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
 
+export default function AttendanceTable({ userId }) {
+  const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [attendanceRecords, setAttendanceRecords] = useState({});
-  const [selectedDate, setSelectedDate] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,176 +53,163 @@ export default function SmallCalendar({ userId }) {
     return () => unsubscribe();
   }, [userId]);
 
-  // Prepare calendar days with padding for first day
-  const firstDay = new Date(year, month, 1).getDay(); // Sun=0
   const totalDays = daysInMonth(year, month);
 
-  const days = [];
-  for (let i = 1; i <= totalDays; i++) {
-    days.push(new Date(year, month, i));
-  }
+  const years = [];
+  const currentYear = today.getFullYear();
+  for (let y = currentYear - 5; y <= currentYear + 5; y++) years.push(y);
 
-  const prevMonth = () => {
-    if (month === 0) {
-      setYear(y => y - 1);
-      setMonth(11);
-    } else {
-      setMonth(m => m - 1);
-    }
-    setSelectedDate(null);
-  };
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
-  const nextMonth = () => {
-    if (month === 11) {
-      setYear(y => y + 1);
-      setMonth(0);
-    } else {
-      setMonth(m => m + 1);
-    }
-    setSelectedDate(null);
-  };
+  const daysArray = [...Array(totalDays).keys()].map(i => i + 1);
 
-  const selectedRecord = selectedDate ? attendanceRecords[selectedDate] : null;
+  // Calculate total monthly worked seconds
+  let monthlyWorkedSeconds = 0;
 
   return (
-    <div style={{
-      width: 300,
-      background: '#fff',
-      borderRadius: 10,
-      boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-      padding: 16,
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-      userSelect: 'none'
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-      }}>
-        <button onClick={prevMonth} style={navBtnStyle} aria-label="Previous Month">‹</button>
-        <div style={{ fontWeight: '700', fontSize: 16 }}>
-          {new Date(year, month).toLocaleString('default', { month: 'short', year: 'numeric' })}
-        </div>
-        <button onClick={nextMonth} style={navBtnStyle} aria-label="Next Month">›</button>
+    <div style={styles.container}>
+      {/* Year & Month selectors in one row */}
+      <div style={styles.header}>
+        <select
+          aria-label="Select Year"
+          value={year}
+          onChange={e => setYear(parseInt(e.target.value))}
+          style={styles.select}
+        >
+          {years.map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        <select
+          aria-label="Select Month"
+          value={month}
+          onChange={e => setMonth(parseInt(e.target.value))}
+          style={styles.select}
+        >
+          {months.map((m, i) => (
+            <option key={m} value={i}>{m}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Weekday Labels */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        fontSize: 11,
-        color: '#888',
-        textAlign: 'center',
-        marginBottom: 6,
-        fontWeight: '600',
-      }}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-          <div key={day}>{day}</div>
-        ))}
-      </div>
+      {loading ? (
+        <p style={styles.loading}>Loading attendance...</p>
+      ) : (
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Date</th>
+              <th style={styles.th}>Sign In</th>
+              <th style={styles.th}>Break In</th>
+              <th style={styles.th}>Break Out</th>
+              <th style={styles.th}>Sign Out</th>
+              <th style={styles.th}>Hours Worked</th>
+              <th style={styles.th}>Status</th>
+              <th style={styles.th}>Work From Home</th>
+            </tr>
+          </thead>
+          <tbody>
+            {daysArray.map(day => {
+              const dateObj = new Date(year, month, day);
+              const dateKey = formatDateKey(dateObj);
+              const record = attendanceRecords[dateKey];
+              const hasRecord = !!record;
 
-      {/* Days Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: 6,
-      }}>
-        {/* Empty spaces for first day offset */}
-        {Array(firstDay).fill(null).map((_, i) => <div key={'empty-'+i} />)}
+              // Calculate daily worked seconds minus break seconds if available
+              let dailyWorkedSeconds = 0;
+              if (record && record.workingHours) {
+                dailyWorkedSeconds = record.workingHours;
+                if (record.breakDurationSeconds) {
+                  dailyWorkedSeconds -= record.breakDurationSeconds;
+                }
+                if (dailyWorkedSeconds < 0) dailyWorkedSeconds = 0;
+                monthlyWorkedSeconds += dailyWorkedSeconds;
+              }
 
-        {days.map(date => {
-          const dateKey = formatDateKey(date);
-          const hasRecord = !!attendanceRecords[dateKey];
-          const isSelected = selectedDate === dateKey;
+              return (
+                <tr
+                  key={dateKey}
+                  style={{
+                    backgroundColor: hasRecord ? '#e3f2fd' : 'transparent',
+                    fontWeight: hasRecord ? '600' : '400',
+                  }}
+                >
+                  <td style={styles.td}>{`${day} ${months[month]} ${year}`}</td>
+                  <td style={styles.td}>{record ? formatTime(record.signInTime) : '--:--'}</td>
+                  <td style={styles.td}>{record ? formatTime(record.breakInTime) : '--:--'}</td>
+                  <td style={styles.td}>{record ? formatTime(record.breakOutTime) : '--:--'}</td>
+                  <td style={styles.td}>{record ? formatTime(record.signOutTime) : '--:--'}</td>
+                  <td style={styles.td}>{formatDuration(dailyWorkedSeconds)}</td>
+                  <td style={styles.td}>{record ? (record.status ? 'Online' : 'Offline') : '--'}</td>
+                  <td style={styles.td}>{record ? (record.workFromHome ? 'Yes' : 'No') : '--'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
 
-          return (
-            <button
-              key={dateKey}
-              onClick={() => setSelectedDate(dateKey)}
-              style={{
-                aspectRatio: '1 / 1',
-                borderRadius: 6,
-                border: isSelected ? '2px solid #2962ff' : '1px solid #ddd',
-                backgroundColor: isSelected ? '#2962ff' : hasRecord ? '#bbdefb' : 'transparent',
-                color: isSelected ? '#fff' : hasRecord ? '#0d47a1' : '#444',
-                fontWeight: hasRecord ? '700' : '400',
-                fontSize: 14,
-                cursor: 'pointer',
-                outline: 'none',
-                padding: 0,
-              }}
-              aria-label={`Select day ${date.getDate()}`}
-              onMouseEnter={e => {
-                if (!isSelected) e.currentTarget.style.backgroundColor = '#e3f2fd';
-              }}
-              onMouseLeave={e => {
-                if (!isSelected) e.currentTarget.style.backgroundColor = hasRecord ? '#bbdefb' : 'transparent';
-              }}
-            >
-              {date.getDate()}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Attendance Details */}
-      <div style={{ marginTop: 20, minHeight: 130 }}>
-        {loading && <p style={{ textAlign: 'center', color: '#666' }}>Loading attendance...</p>}
-        {!loading && selectedDate && (
-          <>
-            <h4 style={{ marginBottom: 10, color: '#2962ff', fontWeight: '700', fontSize: 16 }}>
-              {selectedDate}
-            </h4>
-            {selectedRecord ? (
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <tbody>
-                  {[
-                    ['Sign In Time', formatTime(selectedRecord.signInTime)],
-                    ['Sign Out Time', formatTime(selectedRecord.signOutTime)],
-                    ['Working Hours', selectedRecord.workingHours
-                      ? new Date(selectedRecord.workingHours * 1000).toISOString().substr(11, 8)
-                      : '--:--:--'],
-                    ['Status', selectedRecord.status ? 'Online' : 'Offline'],
-                    ['Work From Home', selectedRecord.workFromHome ? 'Yes' : 'No'],
-                  ].map(([label, value]) => (
-                    <tr key={label} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '6px 8px', fontWeight: '600', color: '#555', width: '45%', backgroundColor: '#f5f7fa' }}>
-                        {label}
-                      </td>
-                      <td style={{ padding: '6px 8px', color: '#222' }}>{value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p style={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>
-                No attendance record found for this date.
-              </p>
-            )}
-          </>
-        )}
-        {!loading && !selectedDate && (
-          <p style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', fontSize: 13 }}>
-            Select a date to view attendance.
-          </p>
-        )}
-      </div>
+          {/* Monthly total row */}
+          <tfoot>
+            <tr style={{ backgroundColor: '#bbdefb', fontWeight: '700' }}>
+              <td colSpan={5} style={{ ...styles.td, textAlign: 'right' }}>Total Monthly Hours Worked:</td>
+              <td style={styles.td}>{formatDuration(monthlyWorkedSeconds)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      )}
     </div>
   );
 }
 
-const navBtnStyle = {
-  border: 'none',
-  background: '#2962ff',
-  color: 'white',
-  borderRadius: 6,
-  width: 26,
-  height: 26,
-  fontSize: 18,
-  fontWeight: '700',
-  cursor: 'pointer',
-  userSelect: 'none',
-  lineHeight: 1,
+const styles = {
+  container: {
+    maxWidth: 1100,
+    margin: 'auto',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 16,
+  },
+  select: {
+    padding: '8px 14px',
+    fontSize: 16,
+    borderRadius: 8,
+    border: '1.5px solid #ccc',
+    cursor: 'pointer',
+    backgroundColor: '#fff',
+  },
+  loading: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: 14,
+  },
+  th: {
+    padding: '12px 8px',
+    borderBottom: '2px solid #2962ff',
+    textAlign: 'center',
+    color: '#2962ff',
+    userSelect: 'none',
+  },
+  td: {
+    padding: '10px 8px',
+    borderBottom: '1px solid #eee',
+    textAlign: 'center',
+    userSelect: 'none',
+  },
 };

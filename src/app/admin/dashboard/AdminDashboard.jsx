@@ -1,124 +1,94 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './AdminDashboard.css';
 
 import { auth, db } from '../../../../lib/firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import AttendanceHistory from '../../components/attendenceHistory/AttendanceHistory';
-import RolesManagement from '../../components/createuser/RolesManagement'
+import RolesManagement from '../../components/createuser/RolesManagement';
 
 export default function AdminDashboard() {
   const [staffList, setStaffList] = useState([]);
   const [activeTab, setActiveTab] = useState('attendance');
   const [selectedStaff, setSelectedStaff] = useState(null);
-
-  const [newUser, setNewUser] = useState({
-    fullName: '',
-    email: '',
-    role: 'staff',
-    designation: '',
-    workFromHome: false,
-    password: '',
-  });
-
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [loadingStaff, setLoadingStaff] = useState(true);
+  const [popupMessage, setPopupMessage] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const prevStaffListRef = useRef([]);
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '--:--';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const day = date.toLocaleDateString('en-US', { weekday: 'short' });
-    const time = date.toLocaleTimeString('en-US', {
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
     });
-    return `${day} ${time}`;
   };
 
   const formatWorkingHours = (seconds) => {
     if (typeof seconds !== 'number' || seconds < 0) return '--:--:--';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return [hrs, mins, secs].map((val) => val.toString().padStart(2, '0')).join(':');
+  };
+
+  const calculateDailyHours = (attendanceHistory) => {
+    let totalSeconds = 0;
+    attendanceHistory.forEach(day => {
+      if (day.workingHours) {
+        totalSeconds += day.workingHours;
+      }
+    });
+    return formatWorkingHours(totalSeconds);
+  };
+
+  const showStatusPopup = (message) => {
+    setPopupMessage(message);
+    setShowPopup(true);
+    setTimeout(() => setShowPopup(false), 3000);
   };
 
   useEffect(() => {
     if (activeTab !== 'attendance') return;
-    setLoadingStaff(true);
     const usersRef = collection(db, 'users');
-    const unsubscribe = onSnapshot(
-      usersRef,
-      (snapshot) => {
-        const staffData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setStaffList(staffData);
-        setLoadingStaff(false);
-      },
-      (error) => {
-        console.error('Error fetching users:', error);
-        setLoadingStaff(false);
-      }
-    );
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+      const updatedStaff = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      prevStaffListRef.current.forEach(prevUser => {
+        const updatedUser = updatedStaff.find(u => u.id === prevUser.id);
+        if (updatedUser && updatedUser.status !== prevUser.status) {
+          showStatusPopup(`${updatedUser.fullName} is now ${updatedUser.status}`);
+        }
+      });
+
+      prevStaffListRef.current = updatedStaff;
+      setStaffList(updatedStaff);
+    });
+
     return () => unsubscribe();
   }, [activeTab]);
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setNewUser(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
-
-    const { fullName, email, password, designation } = newUser;
-    if (!fullName || !email || !password || !designation) {
-      setFormError('Please fill all required fields.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      await setDoc(doc(db, 'users', user.uid), {
-        fullName,
-        email,
-        role: newUser.role,
-        designation,
-        workFromHome: newUser.workFromHome,
-        createdAt: new Date(),
-      });
-
-      setFormSuccess('User created successfully!');
-      setNewUser({
-        fullName: '',
-        email: '',
-        role: 'staff',
-        designation: '',
-        workFromHome: false,
-        password: '',
-      });
-    } catch (error) {
-      setFormError(error.message || 'Failed to create user.');
-    }
-    setLoading(false);
-  };
+  const filteredStaffList = staffList.filter(staff => {
+    if (filter === 'online') return staff.status === 'online';
+    if (filter === 'wfh') return staff.workFromHome;
+    return true;
+  });
 
   return (
     <div className="admin-dashboard">
+      {showPopup && (
+        <div className="status-popup">{popupMessage}</div>
+      )}
+
       <aside className="admin-sidebar">
-        <h2>Admin Dashboard</h2>
+        <h3>Admin Dashboard</h3>
         <nav>
           <ul>
             <li
@@ -129,15 +99,12 @@ export default function AdminDashboard() {
               Staff Attendance
             </li>
             <li
-  className={activeTab === 'rolesManagement' ? 'active' : ''}
-  onClick={() => setActiveTab('rolesManagement')}
-  style={{ cursor: 'pointer' }}
->
-  Roles Management
-</li>
-           
-            <li>Reports</li>
-            <li>Settings</li>
+              className={activeTab === 'rolesManagement' ? 'active' : ''}
+              onClick={() => setActiveTab('rolesManagement')}
+              style={{ cursor: 'pointer' }}
+            >
+              Roles Management
+            </li>
           </ul>
         </nav>
       </aside>
@@ -146,72 +113,98 @@ export default function AdminDashboard() {
         {activeTab === 'attendance' && (
           <>
             <h1>Staff Attendance Overview</h1>
-            {loadingStaff ? (
-              <p>Loading staff data...</p>
-            ) : (
-              <>
-                <table className="staff-table">
-                  <thead>
-                    <tr>
-                      <th>Full Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Designation</th>
-                      <th>Work From Home</th>
-                      <th>Sign In</th>
-                      <th>Sign Out</th>
-                      <th>Status</th>
-                      <th>Working Hours</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staffList.length === 0 ? (
-                      <tr>
-                        <td colSpan="9" style={{ textAlign: 'center' }}>No staff data found.</td>
-                      </tr>
-                    ) : (
-                      staffList.map((staff) => (
-                        <tr
-                          key={staff.id}
-                          onClick={() => setSelectedStaff(staff)}
-                          style={{
-                            cursor: 'pointer',
-                            backgroundColor: selectedStaff?.id === staff.id ? '#f0f8ff' : 'transparent'
-                          }}
-                        >
-                          <td>{staff.fullName}</td>
-                          <td>{staff.email}</td>
-                          <td>{staff.role}</td>
-                          <td>{staff.designation}</td>
-                          <td>{staff.workFromHome ? 'Yes' : 'No'}</td>
-                          <td>{formatTimestamp(staff.signInTime)}</td>
-                          <td>{formatTimestamp(staff.signOutTime)}</td>
-                          <td className={staff.status === 'online' ? 'status-online' : 'status-offline'}>
-                            {staff.status || '--'}
-                          </td>
-                          <td>{staff.workingHours !== undefined ? formatWorkingHours(staff.workingHours) : '--:--:--'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
 
-                {selectedStaff && (
-                  <div className="attendance-history-section">
-                    <h2>{selectedStaff.fullName}'s Attendance History</h2>
-                    <AttendanceHistory userId={selectedStaff.id} />
-                    <button onClick={() => setSelectedStaff(null)}>Close</button>
+            <div className="filter-controls" style={{ padding: '10px', marginBottom: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+              <label style={{ fontWeight: 'bold', marginRight: '10px' }}>
+                Filter:
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  style={{ marginLeft: '10px', padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="all">All</option>
+                  <option value="online">Online</option>
+                  <option value="wfh">Working From Home</option>
+                </select>
+              </label>
+            </div>
+
+            <table className="staff-table">
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Designation</th>
+                  <th>Sign In</th>
+                  <th>Sign Out</th>
+                  <th>Break In</th>
+                  <th>Break Out</th>
+                  <th>Status</th>
+                  <th>Daily Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStaffList.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" style={{ textAlign: 'center' }}>No staff data found.</td>
+                  </tr>
+                ) : (
+                  filteredStaffList.map((staff) => {
+                    const latestBreak = staff.breaks && staff.breaks.length > 0 ? staff.breaks[staff.breaks.length - 1] : null;
+                    return (
+                      <tr
+                        key={staff.id}
+                        onClick={() => setSelectedStaff(staff)}
+                        style={{
+                          cursor: 'pointer',
+                          backgroundColor: selectedStaff?.id === staff.id ? '#f0f8ff' : 'transparent'
+                        }}
+                      >
+                        <td>{staff.fullName}</td>
+                        <td>{staff.email}</td>
+                        <td>{staff.role}</td>
+                        <td>{staff.designation}</td>
+                        <td>{formatTimestamp(staff.signInTime)}</td>
+                        <td>{formatTimestamp(staff.signOutTime)}</td>
+                        <td>{latestBreak ? formatTimestamp(latestBreak.start) : '--:--'}</td>
+                        <td>{latestBreak ? formatTimestamp(latestBreak.end) : '--:--'}</td>
+                        <td className={staff.status === 'online' ? 'status-online' : 'status-offline'}>
+                          {staff.status || '--'}
+                        </td>
+                        <td>{staff.attendanceHistory ? calculateDailyHours(staff.attendanceHistory) : '--:--:--'}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+
+            {selectedStaff && (
+              <div className="attendance-history-section">
+                <h2>{selectedStaff.fullName}'s Attendance History</h2>
+                <AttendanceHistory userId={selectedStaff.id} />
+
+                {selectedStaff.breaks && selectedStaff.breaks.length > 0 && (
+                  <div className="break-history">
+                    <h3>Break History</h3>
+                    <ul>
+                      {selectedStaff.breaks.map((breakItem, index) => (
+                        <li key={index}>
+                          Start: {formatTimestamp(breakItem.start)} | End: {formatTimestamp(breakItem.end)} | Duration: {formatWorkingHours(breakItem.duration * 3600)}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-              </>
+
+                <button onClick={() => setSelectedStaff(null)}>Close</button>
+              </div>
             )}
           </>
         )}
- {activeTab === 'rolesManagement' && (
-          <RolesManagement />
-        )}
-        
-        {/* {activeTab === 'attendanceHistory' && <AttendanceHistory />} */}
+
+        {activeTab === 'rolesManagement' && <RolesManagement />}
       </main>
     </div>
   );

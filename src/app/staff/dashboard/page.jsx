@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   doc,
   getDoc,
@@ -14,6 +14,7 @@ import { auth, db } from '../../../../lib/firebaseConfig';
 import TopBar from '@/app/components/topbar/page';
 import Settings from '../../components/StaffSettings/StaffSettings';
 import './StaffDashboardRemote.css';
+import AttendanceHistoryTable from '../../components/attendenceHistory/AttendanceHistory'
 
 export default function StaffDashboardRemote() {
   const [user, loading, error] = useAuthState(auth);
@@ -22,9 +23,17 @@ export default function StaffDashboardRemote() {
   const [workingTime, setWorkingTime] = useState('00:00');
   const [notes, setNotes] = useState('');
   const [currentDateTime, setCurrentDateTime] = useState('');
-  const [activeSection, setActiveSection] = useState('work'); // 'work', 'notes', 'settings'
+  const [activeSection, setActiveSection] = useState('work');
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [breakStartTime, setBreakStartTime] = useState(null);
+  const [breakDuration, setBreakDuration] = useState(0);
+  const [breaksList, setBreaksList] = useState([]); // Array of break objects {start, end, duration}
+  const [showBreaksList, setShowBreaksList] = useState(false); // Flag to show break list UI
+  
+  // Break timer display (hh:mm:ss)
+  const [breakTimer, setBreakTimer] = useState('00:00:00');
 
-  // Listen for real-time attendance updates
+  // Listen to user data and attendance updates including breaks list
   useEffect(() => {
     if (!user) return;
 
@@ -33,17 +42,32 @@ export default function StaffDashboardRemote() {
       if (!docSnap.exists()) return;
 
       const data = docSnap.data();
-      const signInTime = data.signInTime ? data.signInTime.toDate().toISOString() : null;
-      const signOutTime = data.signOutTime ? data.signOutTime.toDate().toISOString() : null;
-
+      const signInTime = data.signInTime?.toDate().toISOString() ?? null;
+      const signOutTime = data.signOutTime?.toDate().toISOString() ?? null;
+      const breakStart = data.breakStartTime?.toDate().toISOString() ?? null;
+      const breaks = data.breaksList || []; // Array from Firestore
+      
       setAttendance({ signInTime, signOutTime });
       setIsWorking(!!(signInTime && !signOutTime));
+      setBreakStartTime(breakStart);
+      setBreakDuration(data.breakDuration || 0);
+      setBreaksList(breaks);
+      setIsOnBreak(!!breakStart && !signOutTime);
+
+      // Single account enforcement per browser
+      const localUserId = localStorage.getItem('loggedUserId');
+      if (localUserId && localUserId !== user.uid) {
+        alert('Only one account can be used per browser. Please clear local storage or log out.');
+        auth.signOut();
+      } else {
+        localStorage.setItem('loggedUserId', user.uid);
+      }
     });
 
     return () => unsubscribe();
   }, [user]);
 
-  // Local notes storage
+  // Load and save notes locally
   useEffect(() => {
     const savedNotes = localStorage.getItem('dailyNotes');
     if (savedNotes) setNotes(savedNotes);
@@ -53,28 +77,19 @@ export default function StaffDashboardRemote() {
     localStorage.setItem('dailyNotes', notes);
   }, [notes]);
 
-  // Working time calculation
+  // Calculate working time display
   useEffect(() => {
     const updateWorkingTime = () => {
-      if (!attendance.signInTime) {
-        setWorkingTime('00:00');
-        return;
-      }
+      if (!attendance.signInTime) return setWorkingTime('00:00');
 
       const start = new Date(attendance.signInTime);
       const end = attendance.signOutTime ? new Date(attendance.signOutTime) : new Date();
-      const diff = end.getTime() - start.getTime();
+      const diffMinutes = Math.floor((end - start) / 60000);
+      const effectiveMinutes = Math.max(0, diffMinutes - Math.min(breakDuration, diffMinutes));
 
-      if (diff <= 0) {
-        setWorkingTime('00:00');
-        return;
-      }
-
-      const minutes = Math.floor(diff / 60000);
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-
-      setWorkingTime(`${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`);
+      const hours = String(Math.floor(effectiveMinutes / 60)).padStart(2, '0');
+      const mins = String(effectiveMinutes % 60).padStart(2, '0');
+      setWorkingTime(`${hours}:${mins}`);
     };
 
     updateWorkingTime();
@@ -82,168 +97,390 @@ export default function StaffDashboardRemote() {
       const interval = setInterval(updateWorkingTime, 1000);
       return () => clearInterval(interval);
     }
-  }, [attendance, isWorking]);
+  }, [attendance, isWorking, breakDuration]);
 
-  // Live current time
+  // Update current date and time every second
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentDateTime(now.toLocaleString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }));
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(() => {
+      setCurrentDateTime(
+        new Date().toLocaleString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // Format ISO time to hh:mm string or placeholder
   const formatTime = (iso) =>
-    iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }) : '--:--';
 
+
+  {breaksList.map((brk, index) => (
+  <li key={index}>
+    Break {index + 1}: {new Date(brk.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+    {' - '}
+    {new Date(brk.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+    {' ('}{brk.duration} min)
+  </li>
+))}
+  // Format seconds to hh:mm:ss
+  const formatDuration = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return [hrs, mins, secs]
+      .map((v) => String(v).padStart(2, '0'))
+      .join(':');
+  };
+
+
+  
+  // Calculate total break time from breaks list (in minutes)
+  const totalBreakTime = breaksList.reduce((acc, b) => acc + (b.duration || 0), 0);
+
+  // Update break timer display every second while on break
+  useEffect(() => {
+    if (!isOnBreak || !breakStartTime) {
+      setBreakTimer('00:00:00');
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const start = new Date(breakStartTime);
+      const now = new Date();
+      const diffSeconds = Math.floor((now - start) / 1000);
+      setBreakTimer(formatDuration(diffSeconds));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isOnBreak, breakStartTime]);
+
+  // Handle sign in
   const handleSignIn = async () => {
-    if (!user) {
-      alert('You must be logged in to sign in.');
+    if (!user) return alert('You must be logged in to sign in.');
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const attendanceRef = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
+    const attendanceSnap = await getDoc(attendanceRef);
+
+    if (attendanceSnap.exists() && attendanceSnap.data().signInTime) {
+      alert('Already signed in today.');
       return;
     }
 
-    try {
-      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' }));
-      const dateStr = now.toISOString().split('T')[0];
+    await setDoc(attendanceRef, {
+      date: dateStr,
+      signInTime: serverTimestamp(),
+      signOutTime: null,
+      workingHours: 0,
+      breakDuration: 0,
+      breakStartTime: null,
+      breaksList: [],
+    });
 
-      const attendanceRef = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
-      const attendanceSnap = await getDoc(attendanceRef);
-
-      if (!attendanceSnap.exists()) {
-        await setDoc(attendanceRef, {
-          date: dateStr,
-          signInTime: serverTimestamp(),
-          signOutTime: null,
-          workingHours: 0,
-          workFromHome: true,
-        });
-      } else {
-        await updateDoc(attendanceRef, {
-          signInTime: serverTimestamp(),
-          signOutTime: null,
-          workingHours: 0,
-        });
-      }
-
-      await updateDoc(doc(db, 'users', user.uid), {
-        signInTime: serverTimestamp(),
-        signOutTime: null,
-        status: 'online',
-      });
-    } catch (err) {
-      console.error('Sign-in error:', err);
-      alert('Failed to sign in.');
-    }
+    await updateDoc(doc(db, 'users', user.uid), {
+      signInTime: serverTimestamp(),
+      signOutTime: null,
+      status: 'online',
+      breakDuration: 0,
+      breakStartTime: null,
+      breaksList: [],
+    });
   };
 
-  const handleSignOut = async () => {
-    if (!user) {
-      alert('You must be logged in to sign out.');
+  // Handle sign out with confirmation
+  const handleSignOut = useCallback(async () => {
+    if (!user) return alert('You must be logged in to sign out.');
+
+    const confirmed = window.confirm('Are you sure you want to sign out?');
+    if (!confirmed) return;
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const attendanceRef = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
+
+    if (!attendance.signInTime || attendance.signOutTime) {
+      alert('Invalid sign-out attempt.');
       return;
     }
 
-    try {
-      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' }));
-      const dateStr = now.toISOString().split('T')[0];
+    const signInDate = new Date(attendance.signInTime);
+    const hoursWorked = Math.max(0, (now - signInDate) / 3600000);
 
-      const attendanceRef = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
+    if (hoursWorked < 0.1) {
+      alert('You need to work at least 5 minutes before signing out.');
+      return;
+    }
 
-      let hoursWorked = 0;
-      if (attendance.signInTime) {
-        const signInDate = new Date(attendance.signInTime);
-        const diff = now.getTime() - signInDate.getTime();
-        hoursWorked = diff > 0 ? diff / (1000 * 60 * 60) : 0;
-        hoursWorked = Number(hoursWorked.toFixed(2));
-      }
+    await updateDoc(attendanceRef, {
+      signOutTime: serverTimestamp(),
+      workingHours: Number(hoursWorked.toFixed(3)),
+      breakStartTime: null,
+    });
 
-      await updateDoc(attendanceRef, {
-        signOutTime: serverTimestamp(),
-        workingHours: hoursWorked,
-      });
+    await updateDoc(doc(db, 'users', user.uid), {
+      signOutTime: serverTimestamp(),
+      status: 'offline',
+      breakStartTime: null,
+    });
 
-      await updateDoc(doc(db, 'users', user.uid), {
-        signOutTime: serverTimestamp(),
-        status: 'offline',
-      });
-    } catch (err) {
-      console.error('Sign-out error:', err);
-      alert('Failed to sign out.');
+    setIsOnBreak(false);
+    setBreakStartTime(null);
+    setBreakDuration(0);
+    setBreaksList([]);
+    setShowBreaksList(false);
+  }, [user, attendance]);
+
+  // Handle break start
+  const handleBreakStart = async () => {
+    if (!user || !isWorking) return alert('Sign in before starting a break.');
+
+    // If already on break, do nothing
+    if (isOnBreak) return alert('You are already on a break.');
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const userDoc = doc(db, 'users', user.uid);
+    const attendanceDoc = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
+
+    // Update breakStartTime in both user and attendance record
+    await updateDoc(userDoc, { breakStartTime: serverTimestamp() });
+    await updateDoc(attendanceDoc, { breakStartTime: serverTimestamp() });
+
+    setIsOnBreak(true);
+    setBreakStartTime(now.toISOString());
+
+    // If breaksList length >= 2 (meaning this is 3rd break), show breaks list UI
+    if (breaksList.length >= 2) {
+      setShowBreaksList(true);
     }
   };
 
-  if (loading) return <div style={{ padding: 20 }}>Loading user info...</div>;
-  if (error) return <div style={{ padding: 20 }}>Error: {error.message}</div>;
-  if (!user) return <div style={{ padding: 20 }}><h2>Please log in to access your dashboard.</h2></div>;
+  // Handle break end
+  const handleBreakEnd = async () => {
+    if (!user || !isOnBreak) return alert('You are not on a break.');
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const attendanceDoc = doc(db, 'users', user.uid, 'attendanceRecords', dateStr);
+    const userDoc = doc(db, 'users', user.uid);
+
+    const breakStartDate = breakStartTime ? new Date(breakStartTime) : null;
+    if (!breakStartDate) {
+      alert('Break start time not found.');
+      return;
+    }
+
+    const diffMinutes = Math.floor((now - breakStartDate) / 60000);
+
+    // Create new break object
+    const newBreak = {
+      start: breakStartDate.toISOString(),
+      end: now.toISOString(),
+      duration: diffMinutes,
+    };
+
+    // Update breaksList by appending newBreak
+    const updatedBreaksList = [...breaksList, newBreak];
+
+    // Calculate new total break duration
+    const totalDuration = updatedBreaksList.reduce((acc, b) => acc + (b.duration || 0), 0);
+
+    // Update Firestore with new break info
+    await updateDoc(attendanceDoc, {
+      breakDuration: totalDuration,
+      breakStartTime: null,
+      breaksList: updatedBreaksList,
+    });
+    await updateDoc(userDoc, {
+      breakDuration: totalDuration,
+      breakStartTime: null,
+      breaksList: updatedBreaksList,
+    });
+
+    setBreakDuration(totalDuration);
+    setBreaksList(updatedBreaksList);
+    setIsOnBreak(false);
+    setBreakStartTime(null);
+  };
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+  if (!user) return <p>Please log in to view your dashboard.</p>;
 
   return (
     <>
       <TopBar />
       <div className="dashboard-container-remote">
         <aside className="sidebar-remote">
-          <h2>Staff Dashboard</h2>
-          <div className={`status-indicator ${isWorking ? 'online' : 'offline'}`}><strong>{isWorking ? 'Online' : 'Offline'}</strong></div>
+          {/* <h2>Remote Dashboard</h2> */}
+          <div className={`status-indicator ${isWorking ? 'online' : 'offline'}`}>
+            {isWorking ? 'Online' : 'Offline'}
+          </div>
           <nav>
             <ul>
-              <li onClick={() => setActiveSection('work')} className={activeSection === 'work' ? 'active' : ''}>Work Status</li>
-              <li onClick={() => setActiveSection('notes')} className={activeSection === 'notes' ? 'active' : ''}>Notes</li>
-              <li onClick={() => setActiveSection('settings')} className={activeSection === 'settings' ? 'active' : ''}>Settings</li>
+              <li
+                className={activeSection === 'work' ? 'active' : ''}
+                onClick={() => setActiveSection('work')}
+              >
+                Work Status
+              </li>
+              <li
+                className={activeSection === 'notes' ? 'active' : ''}
+                onClick={() => setActiveSection('notes')}
+              >
+                Notes
+              </li>
+             <li
+  className={activeSection === 'history' ? 'active' : ''}
+  onClick={() => setActiveSection('history')}
+>
+  History
+</li>
+              <li
+                className={activeSection === 'settings' ? 'active' : ''}
+                onClick={() => setActiveSection('settings')}
+              >
+                Settings
+              </li>
             </ul>
           </nav>
         </aside>
 
         <main className="content-remote">
+          {/* BREAK TIMER: Show at top right if on break */}
+          {isOnBreak && (
+            <div className="break-timer">
+              ⏱️ Break Time: {breakTimer}
+            </div>
+          )}
+
           {activeSection === 'work' && (
-            <section className="attendance-section">
-              <h1>Work Status</h1>
-              <div className="attendance-card-remote">
+            <>
+              <h1>Welcome, {user.displayName || user.email}</h1>
+              <p>Current Date & Time: {currentDateTime}</p>
+
+              <section className="attendance-card-remote">
                 <div className="attendance-info">
-                  <div><strong>Date & Time:</strong> {currentDateTime}</div>
-                  <div><strong>Signed In:</strong> {formatTime(attendance.signInTime)}</div>
-                  <div><strong>Signed Out:</strong> {formatTime(attendance.signOutTime)}</div>
-                  <div><strong>Working Time:</strong> {workingTime}</div>
+                  <div>Sign In: {formatTime(attendance.signInTime)}</div>
+                  <div>Sign Out: {formatTime(attendance.signOutTime)}</div>
+                  <div>
+                    Working Time:{' '}
+                    {workingTime === '00:00' && !isWorking ? 'Too short to count' : workingTime}
+                  </div>
+                  <div>Break Time: {breakDuration} min</div>
                 </div>
+
                 <div className="attendance-actions">
                   {!isWorking ? (
-                    <button onClick={handleSignIn} className="btn-primary">Sign In</button>
+                    <button onClick={handleSignIn} className="btn-primary">
+                      Sign In
+                    </button>
                   ) : (
-                    <button onClick={handleSignOut} className="btn-danger">Sign Out</button>
+                    <button onClick={handleSignOut} className="btn-danger">
+                      Sign Out
+                    </button>
                   )}
                 </div>
-              </div>
-            </section>
+
+                {isWorking && (
+                  <div className="break-actions">
+                    {!isOnBreak ? (
+                      <button onClick={handleBreakStart} className="btn-warning">
+                        Start Break
+                      </button>
+                    ) : (
+                      <button onClick={handleBreakEnd} className="btn-secondary">
+                        End Break
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* Show breaks list if user took more than 2 breaks */}
+              {showBreaksList && breaksList.length > 0 && (
+                <section className="breaks-list-section">
+                  <h3>Breaks taken today:</h3>
+                  <ul>
+                    {breaksList.map((brk, index) => (
+                      <li key={index}>
+                        Break {index + 1}: {new Date(brk.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(brk.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({brk.duration} min)
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Total Break Time:</strong> {totalBreakTime} minutes
+                  </p>
+                </section>
+              )}
+            </>
           )}
 
           {activeSection === 'notes' && (
-            <section className="notes-section">
+            <div className="notes-section">
               <h2>Daily Notes</h2>
               <textarea
-                placeholder="Write your notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={8}
+                placeholder="Write your notes here..."
               />
-              <small>Notes are saved in your browser's local storage.</small>
-            </section>
+              <small>Notes are saved locally in your browser.</small>
+            </div>
           )}
 
           {activeSection === 'settings' && (
-            <section className="settings-section">
+            <>
+              <h2>Settings</h2>
               <Settings />
-            </section>
+            </>
           )}
+          {activeSection === 'history' && (
+    <>
+      <h2>Attendance History</h2>
+      <AttendanceHistoryTable userId={user.uid} />
+    </>
+  )}
         </main>
+      
       </div>
+
+      <style jsx>{`
+        .break-timer {
+          position: fixed;
+          top: 100px;
+          right: 10px;
+          background: #ffc107;
+          padding: 8px 14px;
+          border-radius: 6px;
+          font-weight: 600;
+          color: #000;
+          box-shadow: 0 0 6px #d4a200;
+          z-index: 1000;
+        }
+        .breaks-list-section {
+          margin-top: 20px;
+          padding: 10px;
+          background: #f9f9f9;
+          border-radius: 8px;
+          box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+        }
+        .breaks-list-section ul {
+          list-style-type: none;
+          padding-left: 0;
+        }
+        .breaks-list-section li {
+          margin-bottom: 6px;
+        }
+      `}</style>
     </>
   );
 }
