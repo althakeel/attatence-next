@@ -16,7 +16,6 @@ function formatTime(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Format seconds as HH:mm:ss
 function formatDuration(seconds) {
   if (typeof seconds !== 'number' || seconds <= 0) return '--:--:--';
   const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -35,16 +34,16 @@ export default function AttendanceTable({ userId }) {
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
-    const attendanceRef = collection(db, 'users', userId, 'attendanceRecords');
 
+    const attendanceRef = collection(db, 'users', userId, 'attendanceRecords');
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
       const data = {};
       snapshot.docs.forEach(doc => {
         const record = doc.data();
-        if (record.createdAt) {
-          const dateKey = record.createdAt.toDate().toISOString().split('T')[0];
-          data[dateKey] = record;
-        }
+        const dateKey = record.createdAt
+          ? record.createdAt.toDate().toISOString().split('T')[0]
+          : doc.id;
+        data[dateKey] = record;
       });
       setAttendanceRecords(data);
       setLoading(false);
@@ -54,45 +53,23 @@ export default function AttendanceTable({ userId }) {
   }, [userId]);
 
   const totalDays = daysInMonth(year, month);
-
-  const years = [];
-  const currentYear = today.getFullYear();
-  for (let y = currentYear - 5; y <= currentYear + 5; y++) years.push(y);
-
+  const daysArray = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const years = Array.from({ length: 11 }, (_, i) => today.getFullYear() - 5 + i);
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const daysArray = [...Array(totalDays).keys()].map(i => i + 1);
-
-  // Calculate total monthly worked seconds
   let monthlyWorkedSeconds = 0;
 
   return (
     <div style={styles.container}>
-      {/* Year & Month selectors in one row */}
       <div style={styles.header}>
-        <select
-          aria-label="Select Year"
-          value={year}
-          onChange={e => setYear(parseInt(e.target.value))}
-          style={styles.select}
-        >
-          {years.map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
+        <select value={year} onChange={e => setYear(parseInt(e.target.value))} style={styles.select}>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-
-        <select
-          aria-label="Select Month"
-          value={month}
-          onChange={e => setMonth(parseInt(e.target.value))}
-          style={styles.select}
-        >
-          {months.map((m, i) => (
-            <option key={m} value={i}>{m}</option>
-          ))}
+        <select value={month} onChange={e => setMonth(parseInt(e.target.value))} style={styles.select}>
+          {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
         </select>
       </div>
 
@@ -117,11 +94,10 @@ export default function AttendanceTable({ userId }) {
               const dateObj = new Date(year, month, day);
               const dateKey = formatDateKey(dateObj);
               const record = attendanceRecords[dateKey];
-              const hasRecord = !!record;
+              const hasRecord = Boolean(record);
 
-              // Calculate daily worked seconds minus break seconds if available
               let dailyWorkedSeconds = 0;
-              if (record && record.workingHours) {
+              if (record?.workingHours) {
                 dailyWorkedSeconds = record.workingHours;
                 if (record.breakDurationSeconds) {
                   dailyWorkedSeconds -= record.breakDurationSeconds;
@@ -131,18 +107,15 @@ export default function AttendanceTable({ userId }) {
               }
 
               return (
-                <tr
-                  key={dateKey}
-                  style={{
-                    backgroundColor: hasRecord ? '#e3f2fd' : 'transparent',
-                    fontWeight: hasRecord ? '600' : '400',
-                  }}
-                >
+                <tr key={dateKey} style={{
+                  backgroundColor: hasRecord ? '#e3f2fd' : 'transparent',
+                  fontWeight: hasRecord ? '600' : '400',
+                }}>
                   <td style={styles.td}>{`${day} ${months[month]} ${year}`}</td>
-                  <td style={styles.td}>{record ? formatTime(record.signInTime) : '--:--'}</td>
-                  <td style={styles.td}>{record ? formatTime(record.breakInTime) : '--:--'}</td>
-                  <td style={styles.td}>{record ? formatTime(record.breakOutTime) : '--:--'}</td>
-                  <td style={styles.td}>{record ? formatTime(record.signOutTime) : '--:--'}</td>
+                  <td style={styles.td}>{formatTime(record?.signInTime)}</td>
+                  <td style={styles.td}>{formatTime(record?.breakInTime)}</td>
+                  <td style={styles.td}>{formatTime(record?.breakOutTime)}</td>
+                  <td style={styles.td}>{formatTime(record?.signOutTime)}</td>
                   <td style={styles.td}>{formatDuration(dailyWorkedSeconds)}</td>
                   <td style={styles.td}>{record ? (record.status ? 'Online' : 'Offline') : '--'}</td>
                   <td style={styles.td}>{record ? (record.workFromHome ? 'Yes' : 'No') : '--'}</td>
@@ -150,8 +123,6 @@ export default function AttendanceTable({ userId }) {
               );
             })}
           </tbody>
-
-          {/* Monthly total row */}
           <tfoot>
             <tr style={{ backgroundColor: '#bbdefb', fontWeight: '700' }}>
               <td colSpan={5} style={{ ...styles.td, textAlign: 'right' }}>Total Monthly Hours Worked:</td>
