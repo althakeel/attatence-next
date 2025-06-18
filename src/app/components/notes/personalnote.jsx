@@ -7,21 +7,24 @@ import {
   where,
   getDocs,
   addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   Timestamp,
 } from 'firebase/firestore';
+
 import { db } from '../../../../lib/firebaseConfig';
 import { useAuth } from '../../hooks/useAuth';
 import './PersonalNote.css';
 
 export default function StaffNotesManager({ showStatusPopup }) {
   const { currentUser } = useAuth();
-
-  const [mode, setMode] = useState('view'); // 'view' or 'add'
+  const [mode, setMode] = useState('view');
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const [noteText, setNoteText] = useState('');
-  const [noteDate, setNoteDate] = useState('');
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState('');
 
   useEffect(() => {
     if (currentUser) {
@@ -31,23 +34,13 @@ export default function StaffNotesManager({ showStatusPopup }) {
     }
   }, [currentUser]);
 
-  // Fetch notes filtered by userId only, then sort in JS by date desc
   async function fetchNotes() {
     setLoading(true);
     try {
       const notesRef = collection(db, 'dailyNotes');
-
-      // Query only by userId (no orderBy)
       const q = query(notesRef, where('userId', '==', currentUser.uid));
       const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
-        setNotes([]);
-        setLoading(false);
-        return;
-      }
-
-      // Map docs to data, convert timestamps to Date
       let fetchedNotes = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
@@ -58,9 +51,7 @@ export default function StaffNotesManager({ showStatusPopup }) {
         };
       });
 
-      // Sort notes by date descending (latest first)
       fetchedNotes.sort((a, b) => b.date - a.date);
-
       setNotes(fetchedNotes);
     } catch (error) {
       console.error('Error fetching notes:', error);
@@ -73,31 +64,23 @@ export default function StaffNotesManager({ showStatusPopup }) {
   async function handleAddNoteSubmit(e) {
     e.preventDefault();
 
-    if (!noteText.trim() || !noteDate) {
-      showStatusPopup?.('Please enter note text and select a date.');
-      return;
-    }
-
-    if (!currentUser) {
-      showStatusPopup?.('User not authenticated.');
-      return;
-    }
+    if (!noteText.trim()) return showStatusPopup?.('Please enter note text.');
+    if (!currentUser) return showStatusPopup?.('User not authenticated.');
 
     setLoading(true);
     try {
-      const notesRef = collection(db, 'dailyNotes');
+      const now = new Date();
+      const todayDateOnly = new Date(now.toDateString());
 
-      await addDoc(notesRef, {
+      await addDoc(collection(db, 'dailyNotes'), {
         note: noteText.trim(),
         userId: currentUser.uid,
-        createdAt: Timestamp.now(),
-        date: Timestamp.fromDate(new Date(noteDate + 'T00:00:00')),
+        createdAt: Timestamp.fromDate(now),
+        date: Timestamp.fromDate(todayDateOnly),
       });
 
       setNoteText('');
-      setNoteDate('');
       showStatusPopup?.('Note added successfully!');
-
       await fetchNotes();
       setMode('view');
     } catch (error) {
@@ -108,96 +91,107 @@ export default function StaffNotesManager({ showStatusPopup }) {
     }
   }
 
+  const handleSaveEdit = async (id) => {
+    if (!editText.trim()) return showStatusPopup?.("Note can't be empty.");
+    try {
+      await updateDoc(doc(db, 'dailyNotes', id), { note: editText.trim() });
+      showStatusPopup?.('Note updated successfully!');
+      setEditId(null);
+      await fetchNotes();
+    } catch (error) {
+      console.error('Error updating note:', error);
+      showStatusPopup?.('Failed to update note.');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'dailyNotes', id));
+      showStatusPopup?.('Note deleted.');
+      await fetchNotes();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      showStatusPopup?.('Failed to delete note.');
+    }
+  };
+
   return (
     <div className="notes-manager-container">
-      <h2 className="section-title">Daily Notes</h2>
+      {/* <h2 className="section-title">Daily Notes</h2> */}
 
       <div className="btn-group">
-        <button
-          className={`btn ${mode === 'view' ? 'active' : ''}`}
-          onClick={() => setMode('view')}
-          disabled={loading}
-          aria-pressed={mode === 'view'}
-        >
-          View Saved Notes
-        </button>
-        <button
-          className={`btn ${mode === 'add' ? 'active' : ''}`}
-          onClick={() => setMode('add')}
-          disabled={loading}
-          aria-pressed={mode === 'add'}
-        >
-          Add Note
-        </button>
+        <button onClick={() => setMode('view')} disabled={loading} className={`btn ${mode === 'view' ? 'active' : ''}`}>View Notes</button>
+        <button onClick={() => setMode('add')} disabled={loading} className={`btn ${mode === 'add' ? 'active' : ''}`}>Add Note</button>
       </div>
 
       {mode === 'add' && (
-        <form className="note-form" onSubmit={handleAddNoteSubmit} noValidate>
-          <label htmlFor="note-date" className="form-label">
-            Select Date
-          </label>
-          <input
-            type="date"
-            id="note-date"
-            className="form-input"
-            value={noteDate}
-            onChange={(e) => setNoteDate(e.target.value)}
-            required
-          />
-
-          <label htmlFor="note-text" className="form-label">
-            Write your note
-          </label>
+        <form onSubmit={handleAddNoteSubmit} className="note-form">
           <textarea
-            id="note-text"
-            className="form-textarea"
             rows={5}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             placeholder="Write your note here..."
             required
+            className="form-textarea"
           />
-
-          <button
-            type="submit"
-            className="submit-button"
-            disabled={loading}
-            aria-busy={loading}
-          >
+          <button type="submit" disabled={loading} className="submit-button">
             {loading ? 'Saving...' : 'Add Note'}
           </button>
         </form>
       )}
 
       {mode === 'view' && (
-        <section className="notes-list" aria-live="polite">
+        <div className="notes-list">
           {loading ? (
-            <p className="info-text">Loading notes...</p>
+            <p>Loading notes...</p>
           ) : notes.length === 0 ? (
-            <p className="info-text">No notes found. Add a new note above.</p>
+            <p className="info-text">No notes found.</p>
           ) : (
-            notes.map(({ id, note, date, createdAt }) => (
-              <article
-                key={id}
-                className="note-item"
-                aria-label={`Note dated ${date?.toLocaleDateString()}`}
-              >
-                <div
-                  className="note-content"
-                  dangerouslySetInnerHTML={{ __html: note }}
-                />
-                <div className="note-meta">
-                  <small className="note-date">
-                    Date: {date?.toLocaleDateString() || 'Unknown'}
-                  </small>
-                  <small className="note-created">
-                    Saved at: {createdAt?.toLocaleString() || 'Unknown time'}
-                  </small>
-                </div>
-              </article>
-            ))
+            <table className="notes-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Note</th>
+                  <th>Saved At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notes.map(({ id, date, createdAt, note }) => (
+                  <tr key={id}>
+                    <td>{date?.toLocaleDateString()}</td>
+                    <td>
+                      {editId === id ? (
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          rows={3}
+                          className="editable-note"
+                        />
+                      ) : (
+                        <div className="note-content">{note}</div>
+                      )}
+                    </td>
+                    <td>{createdAt?.toLocaleString()}</td>
+                    <td>
+                      {editId === id ? (
+                        <>
+                          <button onClick={() => handleSaveEdit(id)} className="save-button">Save</button>
+                          <button onClick={() => setEditId(null)} className="btn">Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditId(id); setEditText(note); }} className="btn">Edit</button>
+                          <button onClick={() => handleDelete(id)} className="btn">Delete</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </section>
+        </div>
       )}
     </div>
   );

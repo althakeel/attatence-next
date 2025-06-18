@@ -31,11 +31,8 @@ export default function StaffDashboardRemote() {
   const [breaksList, setBreaksList] = useState([]); // Array of break objects {start, end, duration}
   const [showBreaksList, setShowBreaksList] = useState(false); // Flag to show break list UI
   
-  
-  // Break timer display (hh:mm:ss)
-  const [breakTimer, setBreakTimer] = useState('00:00:00');
 
-  // Listen to user data and attendance updates including breaks list
+  const [breakTimer, setBreakTimer] = useState('00:00:00');
   useEffect(() => {
     if (!user) return;
 
@@ -56,7 +53,6 @@ export default function StaffDashboardRemote() {
       setBreaksList(breaks);
       setIsOnBreak(!!breakStart && !signOutTime);
 
-      // Single account enforcement per browser
       const localUserId = localStorage.getItem('loggedUserId');
       if (localUserId && localUserId !== user.uid) {
         alert('Only one account can be used per browser. Please clear local storage or log out.');
@@ -70,8 +66,6 @@ export default function StaffDashboardRemote() {
   }, [user]);
 
 
-  
-  // Load and save notes locally
   useEffect(() => {
     const savedNotes = localStorage.getItem('dailyNotes');
     if (savedNotes) setNotes(savedNotes);
@@ -370,7 +364,7 @@ export default function StaffDashboardRemote() {
           {activeSection === 'work' && (
             <>
               <h1>Welcome, {user.displayName || user.email}</h1>
-              <p>Current Date & Time: {currentDateTime}</p>
+              <p>{currentDateTime}</p>
 
               <section className="attendance-card-remote">
                 <div className="attendance-info">
