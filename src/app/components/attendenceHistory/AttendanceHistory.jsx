@@ -5,10 +5,13 @@ import { db } from '../../../../lib/firebaseConfig';
 function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
-
 function formatDateKey(date) {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`; // Local date string
 }
+
 
 function formatTime(timestamp) {
   if (!timestamp) return '--:--';

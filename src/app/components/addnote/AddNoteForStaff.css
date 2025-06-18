@@ -1,0 +1,202 @@
+/* Wrapper stretches full width with padding */
+.add-note-wrapper {
+  width: 100%;
+  padding: 20px 40px;
+  box-sizing: border-box;
+  background: #f7f8fa;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+/* Card fills width but max width for readability */
+.add-note-card {
+  width: 100%;
+  max-width: 1000px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
+  padding: 30px 40px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+h2 {
+  margin: 0 0 15px 0;
+  font-weight: 700;
+  font-size: 28px;
+  color: #222;
+}
+
+.note-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-field label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 16px;
+  color: #444;
+}
+
+/* Staff select & date inputs styling */
+.note-field select,
+.note-field input[type='date'] {
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1.8px solid #ccc;
+  border-radius: 5px;
+  outline-offset: 2px;
+  transition: border-color 0.25s ease;
+}
+
+.note-field select:focus,
+.note-field input[type='date']:focus {
+  border-color: #3f8efc;
+}
+
+/* Toolbar styles */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.toolbar button {
+  background: #eee;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.toolbar button:hover {
+  background: #ddd;
+}
+
+.color-picker {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  vertical-align: middle;
+  border-radius: 5px;
+}
+
+/* Editor area styling */
+.rich-text-editor {
+  border: 1.8px solid #ccc;
+  border-radius: 7px;
+  min-height: 200px;
+  padding: 12px 15px;
+  font-size: 16px;
+  line-height: 1.5;
+  outline-offset: 2px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  box-sizing: border-box;
+}
+
+.rich-text-editor:focus {
+  border-color: #3f8efc;
+  outline: none;
+}
+
+/* Save button */
+.add-note-button {
+  margin-top: 15px;
+  padding: 14px 25px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 7px;
+  border: none;
+  background-color: #3f8efc;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+
+.add-note-button:disabled {
+  background-color: #a5c1ff;
+  cursor: not-allowed;
+}
+
+.add-note-button:hover:not(:disabled) {
+  background-color: #246bcc;
+}
+
+/* Success message */
+.success-message {
+  margin-top: 10px;
+  font-weight: 600;
+  color: green;
+}
+
+
+.notes-viewer {
+  margin-top: 20px;
+}
+
+.staff-list {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.staff-item {
+  background-color: #f0f0f0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+  font-weight: 600;
+  color: #333;
+}
+
+.staff-item:hover,
+.staff-item:focus,
+.staff-item.active {
+  background-color: #3f8efc;
+  color: white;
+  outline: none;
+}
+
+.staff-notes {
+  margin-top: 15px;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.single-note {
+  margin-bottom: 15px;
+}
+
+.note-content {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #222;
+}
+
+.note-timestamp {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}

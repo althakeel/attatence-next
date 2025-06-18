@@ -7,6 +7,7 @@ import { auth, db } from '../../../../lib/firebaseConfig';
 import { collection, onSnapshot } from 'firebase/firestore';
 import AttendanceHistory from '../../components/attendenceHistory/AttendanceHistory';
 import RolesManagement from '../../components/createuser/RolesManagement';
+import AddNoteForStaff from '../../components/addnote/AddNoteForStaff';
 
 export default function AdminDashboard() {
   const [staffList, setStaffList] = useState([]);
@@ -17,17 +18,22 @@ export default function AdminDashboard() {
   const [filter, setFilter] = useState('all');
   const prevStaffListRef = useRef([]);
 
+  const isToday = (date) => {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '--:--';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true,
+      hour12: true
     });
   };
 
@@ -39,13 +45,17 @@ export default function AdminDashboard() {
     return [hrs, mins, secs].map((val) => val.toString().padStart(2, '0')).join(':');
   };
 
-  const calculateDailyHours = (attendanceHistory) => {
+  const calculateTodayHours = (attendanceHistory) => {
+    if (!Array.isArray(attendanceHistory)) return '--:--:--';
     let totalSeconds = 0;
+
     attendanceHistory.forEach(day => {
-      if (day.workingHours) {
+      const date = day.date?.toDate?.() || new Date(day.date);
+      if (isToday(date) && day.workingHours) {
         totalSeconds += day.workingHours;
       }
     });
+
     return formatWorkingHours(totalSeconds);
   };
 
@@ -83,17 +93,18 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-dashboard">
-      {showPopup && (
-        <div className="status-popup">{popupMessage}</div>
-      )}
+      {showPopup && <div className="status-popup">{popupMessage}</div>}
 
       <aside className="admin-sidebar">
-        <h3>Admin Dashboard</h3>
+        <h3 style={{ color: '#fff' }}>Admin Dashboard</h3>
         <nav>
           <ul>
             <li
               className={activeTab === 'attendance' ? 'active' : ''}
-              onClick={() => { setActiveTab('attendance'); setSelectedStaff(null); }}
+              onClick={() => {
+                setActiveTab('attendance');
+                setSelectedStaff(null);
+              }}
               style={{ cursor: 'pointer' }}
             >
               Staff Attendance
@@ -105,6 +116,16 @@ export default function AdminDashboard() {
             >
               Roles Management
             </li>
+            <li
+              className={activeTab === 'addNote' ? 'active' : ''}
+              onClick={() => {
+                setActiveTab('addNote');
+                setSelectedStaff(null);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              Add Note
+            </li>
           </ul>
         </nav>
       </aside>
@@ -112,15 +133,36 @@ export default function AdminDashboard() {
       <main className="admin-content">
         {activeTab === 'attendance' && (
           <>
-            <h1>Staff Attendance Overview</h1>
+            <h1>
+              Staff Attendance Overview (
+              {new Date().toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+              )
+            </h1>
 
-            <div className="filter-controls" style={{ padding: '10px', marginBottom: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+            <div
+              className="filter-controls"
+              style={{
+                padding: '10px',
+                marginBottom: '15px',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px'
+              }}
+            >
               <label style={{ fontWeight: 'bold', marginRight: '10px' }}>
                 Filter:
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  style={{ marginLeft: '10px', padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{
+                    marginLeft: '10px',
+                    padding: '5px 10px',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc'
+                  }}
                 >
                   <option value="all">All</option>
                   <option value="online">Online</option>
@@ -147,11 +189,21 @@ export default function AdminDashboard() {
               <tbody>
                 {filteredStaffList.length === 0 ? (
                   <tr>
-                    <td colSpan="10" style={{ textAlign: 'center' }}>No staff data found.</td>
+                    <td colSpan="10" style={{ textAlign: 'center' }}>
+                      No staff data found.
+                    </td>
                   </tr>
                 ) : (
                   filteredStaffList.map((staff) => {
-                    const latestBreak = staff.breaks && staff.breaks.length > 0 ? staff.breaks[staff.breaks.length - 1] : null;
+                    const todayBreaks = (staff.breaks || []).filter((b) => {
+                      const startDate = b.start?.toDate?.() || new Date(b.start);
+                      return isToday(startDate);
+                    });
+                    const latestBreak = todayBreaks[todayBreaks.length - 1] || null;
+
+                    const signInToday = isToday(new Date(staff.signInTime?.toDate?.() || staff.signInTime || 0));
+                    const signOutToday = isToday(new Date(staff.signOutTime?.toDate?.() || staff.signOutTime || 0));
+
                     return (
                       <tr
                         key={staff.id}
@@ -165,14 +217,14 @@ export default function AdminDashboard() {
                         <td>{staff.email}</td>
                         <td>{staff.role}</td>
                         <td>{staff.designation}</td>
-                        <td>{formatTimestamp(staff.signInTime)}</td>
-                        <td>{formatTimestamp(staff.signOutTime)}</td>
-                        <td>{latestBreak ? formatTimestamp(latestBreak.start) : '--:--'}</td>
-                        <td>{latestBreak ? formatTimestamp(latestBreak.end) : '--:--'}</td>
+                        <td>{signInToday ? formatTimestamp(staff.signInTime) : '--:--'}</td>
+                        <td>{signOutToday ? formatTimestamp(staff.signOutTime) : '--:--'}</td>
+                        <td>{latestBreak?.start ? formatTimestamp(latestBreak.start) : '--:--'}</td>
+                        <td>{latestBreak?.end ? formatTimestamp(latestBreak.end) : '--:--'}</td>
                         <td className={staff.status === 'online' ? 'status-online' : 'status-offline'}>
                           {staff.status || '--'}
                         </td>
-                        <td>{staff.attendanceHistory ? calculateDailyHours(staff.attendanceHistory) : '--:--:--'}</td>
+                        <td>{staff.attendanceHistory ? calculateTodayHours(staff.attendanceHistory) : '--:--:--'}</td>
                       </tr>
                     );
                   })
@@ -187,13 +239,16 @@ export default function AdminDashboard() {
 
                 {selectedStaff.breaks && selectedStaff.breaks.length > 0 && (
                   <div className="break-history">
-                    <h3>Break History</h3>
+                    <h3>Break History (Today)</h3>
                     <ul>
-                      {selectedStaff.breaks.map((breakItem, index) => (
-                        <li key={index}>
-                          Start: {formatTimestamp(breakItem.start)} | End: {formatTimestamp(breakItem.end)} | Duration: {formatWorkingHours(breakItem.duration * 3600)}
-                        </li>
-                      ))}
+                      {selectedStaff.breaks
+                        .filter((b) => isToday(new Date(b.start?.toDate?.() || b.start)))
+                        .map((breakItem, index) => (
+                          <li key={index}>
+                            Start: {formatTimestamp(breakItem.start)} | End: {formatTimestamp(breakItem.end)} | Duration:{' '}
+                            {formatWorkingHours((breakItem.duration || 0) * 3600)}
+                          </li>
+                        ))}
                     </ul>
                   </div>
                 )}
@@ -205,6 +260,11 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'rolesManagement' && <RolesManagement />}
+
+        {activeTab === 'addNote' && (
+  <AddNoteForStaff staffList={staffList} showStatusPopup={showStatusPopup} />
+)}
+
       </main>
     </div>
   );

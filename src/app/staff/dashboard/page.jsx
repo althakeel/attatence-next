@@ -13,6 +13,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../../lib/firebaseConfig';
 import TopBar from '@/app/components/topbar/page';
 import Settings from '../../components/StaffSettings/StaffSettings';
+import Notes from '../../components/notes/notes';
 import './StaffDashboardRemote.css';
 import AttendanceHistoryTable from '../../components/attendenceHistory/AttendanceHistory'
 
@@ -29,6 +30,7 @@ export default function StaffDashboardRemote() {
   const [breakDuration, setBreakDuration] = useState(0);
   const [breaksList, setBreaksList] = useState([]); // Array of break objects {start, end, duration}
   const [showBreaksList, setShowBreaksList] = useState(false); // Flag to show break list UI
+  
   
   // Break timer display (hh:mm:ss)
   const [breakTimer, setBreakTimer] = useState('00:00:00');
@@ -67,6 +69,8 @@ export default function StaffDashboardRemote() {
     return () => unsubscribe();
   }, [user]);
 
+
+  
   // Load and save notes locally
   useEffect(() => {
     const savedNotes = localStorage.getItem('dailyNotes');
@@ -425,17 +429,12 @@ export default function StaffDashboardRemote() {
             </>
           )}
 
-          {activeSection === 'notes' && (
-            <div className="notes-section">
-              <h2>Daily Notes</h2>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Write your notes here..."
-              />
-              <small>Notes are saved locally in your browser.</small>
-            </div>
-          )}
+        {activeSection === 'notes' && (
+  <div className="notes-section">
+    <h2>Daily Notes</h2>
+    <Notes />
+  </div>
+)}
 
           {activeSection === 'settings' && (
             <>
@@ -453,34 +452,6 @@ export default function StaffDashboardRemote() {
       
       </div>
 
-      <style jsx>{`
-        .break-timer {
-          position: fixed;
-          top: 100px;
-          right: 10px;
-          background: #ffc107;
-          padding: 8px 14px;
-          border-radius: 6px;
-          font-weight: 600;
-          color: #000;
-          box-shadow: 0 0 6px #d4a200;
-          z-index: 1000;
-        }
-        .breaks-list-section {
-          margin-top: 20px;
-          padding: 10px;
-          background: #f9f9f9;
-          border-radius: 8px;
-          box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
-        }
-        .breaks-list-section ul {
-          list-style-type: none;
-          padding-left: 0;
-        }
-        .breaks-list-section li {
-          margin-bottom: 6px;
-        }
-      `}</style>
     </>
   );
 }

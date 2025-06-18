@@ -5,61 +5,56 @@ import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      // Slight delay to ensure localStorage sync on new tab
-      await new Promise((r) => setTimeout(r, 100));
+    const validateSession = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // slight delay for localStorage sync
 
       const sessionId = localStorage.getItem('sessionId');
       const userId = localStorage.getItem('userId');
 
       if (!sessionId || !userId) {
-        router.replace('/login');
+        redirectToLogin();
         return;
       }
 
       try {
-        const response = await fetch('/api/validate-session', {
+        const res = await fetch('/api/validate-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId, userId }),
         });
 
-        const { valid, role } = await response.json();
+        if (!res.ok) throw new Error('Invalid response');
 
-        if (!valid) {
-          localStorage.clear();
-          localStorage.setItem('logout-event', Date.now().toString());
-          router.replace('/login');
+        const { valid, role } = await res.json();
+
+        if (!valid || !role) {
+          redirectToLogin();
         } else {
           router.replace(role === 'admin' ? '/admin/dashboard' : '/staff/dashboard');
         }
-      } catch (error) {
-        console.error('Session validation failed:', error);
-        localStorage.clear();
-        localStorage.setItem('logout-event', Date.now().toString());
-        router.replace('/login');
+      } catch (err) {
+        console.error('Session check failed:', err);
+        redirectToLogin();
       } finally {
-        setChecking(false);
+        setCheckingSession(false);
       }
     };
 
-    checkSession();
+    const redirectToLogin = () => {
+      localStorage.clear();
+      localStorage.setItem('logout-event', Date.now().toString());
+      router.replace('/login');
+    };
+
+    validateSession();
   }, [router]);
 
-  if (checking) { 
+  if (checkingSession) {
     return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '1.2rem',
-        color: '#333',
-      }}>
+      <div style={styles.loader}>
         Checking session, please wait...
       </div>
     );
@@ -67,3 +62,15 @@ export default function Home() {
 
   return null;
 }
+
+const styles = {
+  loader: {
+    height: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: 'Segoe UI, sans-serif',
+    fontSize: '1.2rem',
+    color: '#333',
+  },
+};

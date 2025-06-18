@@ -252,3 +252,37 @@ button:focus {
 .login-text {
   color: #2980b9;
 }
+
+/* Floating break timer box */
+.break-timer {
+  position: fixed;
+  top: 100px;
+  right: 10px;
+  background-color: #ffc107;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #000;
+  box-shadow: 0 0 6px #d4a200;
+  z-index: 1000;
+}
+
+/* Section that contains the list of breaks */
+.breaks-list-section {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove default list styling */
+.breaks-list-section ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+/* Style individual list items */
+.breaks-list-section li {
+  margin-bottom: 6px;
+}
